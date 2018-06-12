@@ -47,13 +47,28 @@
   :type 'string
   :group 'scribble-mode)
 
-(defvar scribble-mode-imenu-generic-expression
-  `(("Title"
-     ,(rx "@title" (? (: "[" (* (not (any "]")))) "]") "{" (group (+ (not (any "}")))) "}")
-     1)
-    ("Section"
-     ,(rx "@" (* "sub") "section" (? (: "[" (* (not (any "]")))) "]") "{" (group (+ (not (any "}")))) "}")
-     1)))
+(defvar-local scribble-mode-structural-elements
+  (list "title" "section" "subsection" "subsubsection"))
+
+(defcustom scribble-mode-structural-elements
+  nil ""
+  :safe 'scribble-mode-list-of-strings-p)
+
+(defun scribble-mode-list-of-strings-p (l)
+  "Return non-nil if "
+  (cond
+   ((null l) t)
+   ((not (listp l)) nil)
+   ((stringp (car l)) (scribble-list-of-strings-p (cdr l)))
+   (t nil)))
+
+(defun scribble-mode-imenu-generic-expression ()
+  (mapcar
+   (lambda (s)
+     (list (capitalize s)
+     (format "^ *@%s[^{]*{\\(.*\\)}$" (regexp-quote s))
+     1))
+   scribble-mode-structural-elements))
 
 (defvar scribble-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -101,12 +116,14 @@
     ;; #t #f
     (,(regexp-opt '("#t" "#f") 'symbols)
      (1 font-lock-constant-face))
-    (,(rx (group "@" (+ (not (any space "[" "{" "("))))) ; FIXME
-     (1 font-lock-function-name-face)))
+    ;; (,(rx (group "@" (+ (not (any space "[" "{" "("))))) ; FIXME
+    ;;  (1 font-lock-function-name-face))
+    (,(rx bol "@part" (* space) "{" (group (+ any)) (* space) "}" (* space) eol )
+     (1 org-level-1)))
   "Font lock for `scribble-mode'.")
 
 ;;;###autoload
-(define-derived-mode scribble-mode prog-mode "Scribble"
+(define-derived-mode scribble-mode text-mode "Scribble"
   "Major mode for editing scribble files.
 
 \\{scribble-mode-map}"
@@ -116,7 +133,8 @@
   (set (make-local-variable 'font-lock-defaults)
        '(scribble-mode-font-lock-keywords))
   (set (make-local-variable 'imenu-generic-expression)
-       scribble-mode-imenu-generic-expression)
+       (scribble-mode-imenu-generic-expression))
+  (set (make-local-variable 'imenu-sort-function) 'imenu--sort-by-position)
   (imenu-add-to-menubar "Contents"))
 
 ;;;###autoload
